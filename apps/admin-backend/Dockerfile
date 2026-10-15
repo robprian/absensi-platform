@@ -56,10 +56,9 @@ RUN apk add --no-cache \
         pcntl \
         bcmath \
         gd \
-        xml \
         opcache \
         zip \
-    && pecl install redis \
+    && pecl install redis-6.2.0 \
     && docker-php-ext-enable redis opcache \
     && apk del .build-deps \
     && rm -rf /tmp/* /var/cache/apk/*
