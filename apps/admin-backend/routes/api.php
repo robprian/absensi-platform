@@ -33,6 +33,9 @@ Route::prefix('v1')->group(function () {
     // Public: login with rate limiting.
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
+    // Public (non-sensitive) settings — dipakai PWA sebelum login.
+    Route::get('settings/public', [PublicSettingController::class, 'public'])->middleware('throttle:120,1');
+
     Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
 
         Route::post('auth/logout', [AuthController::class, 'logout']);
@@ -62,9 +65,6 @@ Route::prefix('v1')->group(function () {
         });
         Route::get('reimbursements', [ReimbursementController::class, 'index']);
         Route::get('reimbursements/{reimbursement}', [ReimbursementController::class, 'show']);
-
-        // ---- Public (non-sensitive) settings ----
-        Route::get('settings/public', [PublicSettingController::class, 'public']);
 
         // ---- Notifications ----
         Route::get('notifications', [NotificationController::class, 'index']);

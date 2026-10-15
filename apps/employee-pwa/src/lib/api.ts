@@ -31,7 +31,10 @@ async function request<T>(
 	const res = await fetch(`${V1}${path}`, { ...init, headers });
 	if (res.status === 401) {
 		clearSession();
-		if (typeof window !== 'undefined') window.location.href = '/login';
+		// Jangan hard-reload kalau sudah di /login — cegah loop refresh.
+		if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+			window.location.href = '/login';
+		}
 		throw new ApiError(401, 'Sesi berakhir. Silakan masuk kembali.');
 	}
 	const text = await res.text();
