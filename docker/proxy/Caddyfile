@@ -63,7 +63,8 @@ http://{$APP_DOMAIN} {
 	}
 
 	# Admin Portal (Blade) satu domain dengan PWA, di path /admin/*.
-	handle /admin/* {
+	# `/admin` tanpa trailing slash juga harus ke Laravel (bukan PWA).
+	handle /admin* {
 		import laravel admin-backend:9000
 	}
 

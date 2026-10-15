@@ -23,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // The only web UI is the admin portal; guests go to its login page.
         $middleware->redirectGuestsTo(fn () => route('admin.login'));
+        // Di belakang nginx (TLS) + Caddy: percayai X-Forwarded-* agar
+        // URL/redirect yang dibuat Laravel memakai https:// yang benar.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
