@@ -193,10 +193,19 @@ jobs:
         run: |
           APP_DOMAIN=ci.example.com DOCS_DOMAIN=docs-ci.example.com \
           POSTGRES_PASSWORD=dummy TDOCS_ADMIN_PASSWORD=dummy \
-          docker compose -f compose.yml config -q && echo "compose.yml OK"
+          docker compose -f compose.yml config 2>&1 | tee /tmp/compose-config.log; echo "exit:$?" >> /tmp/compose-config.log
           APP_DOMAIN=ci.example.com DOCS_DOMAIN=docs-ci.example.com \
           POSTGRES_PASSWORD=dummy TDOCS_ADMIN_PASSWORD=dummy \
-          docker compose -f compose.yml -f compose.dev.yml config -q && echo "compose.dev.yml OK"
+          docker compose -f compose.yml -f compose.dev.yml config 2>&1 | tee -a /tmp/compose-config.log; echo "exit:$?" >> /tmp/compose-config.log
+          grep -q "exit:0" /tmp/compose-config.log || (echo "COMPOSE CONFIG FAILED"; exit 1)
+
+      - name: Upload compose log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-config-log
+          path: /tmp/compose-config.log
+          retention-days: 3
 
       - name: Validate Caddyfiles
         run: |
