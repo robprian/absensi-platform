@@ -45,7 +45,7 @@
 }
 
 # ---------------------------------------------------------------- PWA ---
-{$APP_DOMAIN} {
+http://{$APP_DOMAIN} {
 	import security
 	header {
 		# PWA absensi butuh kamera (selfie) + GPS (lokasi absen).
@@ -73,7 +73,7 @@
 }
 
 # --------------------------------------------------------------- TDOCS ---
-{$DOCS_DOMAIN} {
+http://{$DOCS_DOMAIN} {
 	import security
 	header {
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
