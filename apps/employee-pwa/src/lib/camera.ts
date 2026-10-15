@@ -174,7 +174,7 @@ export async function captureWithWatermark(
 		y += size * 1.32;
 	};
 
-		const d = new Date(meta.takenAt.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+	const d = new Date(meta.takenAt.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
 	const tglText = `${d.getDate()} ${BULAN_SINGKAT[d.getMonth()]} ${d.getFullYear()}`;
 	const jamText = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 

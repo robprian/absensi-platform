@@ -5,17 +5,17 @@ SvelteKit 2 + TypeScript + Tailwind CSS 4 + lucide-svelte + vite-plugin-pwa.
 
 ## Rute
 
-| Rute | Fungsi |
-|---|---|
-| `/login` | Masuk (No. HP / ID karyawan + kata sandi) |
-| `/` | Beranda: kartu absen (Belum Absen / Sedang Bekerja / Selesai Bekerja), pintasan |
-| `/absen?type=MASUK\|KELUAR` | Alur kamera + GPS + watermark → kirim absen |
-| `/riwayat` | Riwayat absensi per bulan |
-| `/slip-gaji`, `/slip-gaji/[id]` | Daftar & detail slip gaji final + unduh PDF |
-| `/reimburse` | Pengajuan reimburse (hanya bila diaktifkan admin) |
-| `/profil` | Data karyawan, panduan instalasi, keluar |
-| `/notifikasi` | Notifikasi |
-| `/install` | Panduan instalasi PWA (Android/iOS) |
+| Rute                            | Fungsi                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------- |
+| `/login`                        | Masuk (No. HP / ID karyawan + kata sandi)                                       |
+| `/`                             | Beranda: kartu absen (Belum Absen / Sedang Bekerja / Selesai Bekerja), pintasan |
+| `/absen?type=MASUK\|KELUAR`     | Alur kamera + GPS + watermark → kirim absen                                     |
+| `/riwayat`                      | Riwayat absensi per bulan                                                       |
+| `/slip-gaji`, `/slip-gaji/[id]` | Daftar & detail slip gaji final + unduh PDF                                     |
+| `/reimburse`                    | Pengajuan reimburse (hanya bila diaktifkan admin)                               |
+| `/profil`                       | Data karyawan, panduan instalasi, keluar                                        |
+| `/notifikasi`                   | Notifikasi                                                                      |
+| `/install`                      | Panduan instalasi PWA (Android/iOS)                                             |
 
 ## API
 

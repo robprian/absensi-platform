@@ -68,7 +68,10 @@ export default defineConfig({
 	server: {
 		port: 3000,
 		proxy: {
-			'/api': { target: API_BASE.startsWith('/') ? 'http://localhost:8000' : API_BASE, changeOrigin: true }
+			'/api': {
+				target: API_BASE.startsWith('/') ? 'http://localhost:8000' : API_BASE,
+				changeOrigin: true
+			}
 		}
 	},
 	preview: { port: 3000 },
