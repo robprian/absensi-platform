@@ -15,9 +15,24 @@
 
 	let updateAvailable = false;
 	let updateSW: ((reload: boolean) => Promise<void>) | undefined;
+	// Gerbang auth: jangan render halaman sebelum status sesi dipastikan,
+	// agar tidak ada kedip (halaman terproteksi tampil sesaat lalu redirect).
+	let authChecked = false;
+
+	function guardRoute(path: string, loggedIn: boolean) {
+		if (!loggedIn && !PUBLIC_ROUTES.includes(path)) {
+			void goto('/login');
+		} else if (loggedIn && path === '/login') {
+			void goto('/');
+		}
+	}
 
 	onMount(() => {
 		void loadPublicSettings();
+
+		// Penjaga rute awal: jalan SEKALI sebelum konten dirender.
+		guardRoute(window.location.pathname, $isLoggedIn);
+		authChecked = true;
 
 		updateSW = registerSW({
 			immediate: true,
@@ -34,14 +49,9 @@
 		return () => window.removeEventListener('online', onOnline);
 	});
 
-	// Penjaga rute: semua kecuali login/install butuh sesi.
-	$: if (typeof window !== 'undefined') {
-		const path = $page.url.pathname;
-		if (!$isLoggedIn && !PUBLIC_ROUTES.includes(path)) {
-			void goto('/login');
-		} else if ($isLoggedIn && path === '/login') {
-			void goto('/');
-		}
+	// Penjaga rute untuk navigasi berikutnya (setelah cek awal selesai).
+	$: if (authChecked && typeof window !== 'undefined') {
+		guardRoute($page.url.pathname, $isLoggedIn);
 	}
 
 	$: showNav = $isLoggedIn && !['/login', '/install', '/absen'].includes($page.url.pathname);
@@ -50,7 +60,19 @@
 <div class="min-h-dvh bg-slate-50 text-slate-900">
 	<OfflineBanner />
 	<main class="mx-auto max-w-md pb-24">
-		<slot />
+		{#if authChecked}
+			<slot />
+		{:else}
+			<!-- Splash anti-kedip saat status sesi dipastikan. -->
+			<div class="flex min-h-[60dvh] flex-col items-center justify-center gap-4">
+				<div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-600">
+					<svg class="h-8 w-8 animate-pulse text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<circle cx="12" cy="12" r="9" />
+						<path d="M12 7v5l3 2" stroke-linecap="round" />
+					</svg>
+				</div>
+			</div>
+		{/if}
 	</main>
 	{#if showNav}
 		<BottomNav />
