@@ -14,7 +14,11 @@
 <header class="safe-top glass sticky top-0 z-20">
 	<div class="mx-auto flex max-w-md items-center gap-3 px-5 pb-3 pt-4">
 		{#if logoUrl}
-			<img src={logoUrl} alt="Logo" class="h-11 w-11 shrink-0 rounded-2xl object-contain bg-white shadow-sm p-1" />
+			<img
+				src={logoUrl}
+				alt="Logo"
+				class="h-11 w-11 shrink-0 rounded-2xl object-contain bg-white shadow-sm p-1"
+			/>
 		{:else}
 			<div
 				class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl hero-gradient-emerald shadow-md shadow-emerald-600/25"

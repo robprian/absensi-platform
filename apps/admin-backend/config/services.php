@@ -50,4 +50,19 @@ return [
         'cdn_public' => env('TDOCS_CDN_PUBLIC', '0'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cloudflare Turnstile — anti-bot untuk form login
+    |--------------------------------------------------------------------------
+    | Verifikasi server-side hanya aktif bila secret key dikonfigurasi DAN
+    | setting `turnstile_enabled` = 1 (diatur dari Portal Admin → Pengaturan).
+    | Site key boleh kosong saat integrasi belum disiapkan — form login
+    | tetap jalan tanpa widget.
+    */
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+        'timeout' => env('TURNSTILE_TIMEOUT', 10),
+    ],
+
 ];

@@ -74,6 +74,7 @@
 
 	$: nama = $employee?.nama ?? '';
 	$: reimburseOn = $publicSettings?.reimbursement_enabled ?? false;
+	$: status = today?.status ?? '';
 
 	$: statusLabel =
 		today?.status === 'sedang_bekerja'
@@ -125,13 +126,6 @@
 						.replace('.', ':')}
 				</p>
 				<p class="mt-2 text-center text-slate-500">Ketuk tombol di bawah untuk mulai bekerja</p>
-				<button
-					type="button"
-					on:click={() => keAbsen('MASUK')}
-					class="pressable animate-enter-1 mt-6 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl hero-gradient-emerald text-2xl font-bold text-white shadow-lg shadow-emerald-600/30"
-				>
-					<Play size={28} /> Mulai Kerja
-				</button>
 			{:else if today.status === 'sedang_bekerja'}
 				<p class="mt-6 text-center text-6xl font-extrabold tabular-nums text-slate-900">
 					{formatStopwatch(tick)}
@@ -144,14 +138,38 @@
 						<MapPin size={14} /> <span class="truncate">{today.lokasi_masuk}</span>
 					</p>
 				{/if}
-				<button
-					type="button"
-					on:click={() => keAbsen('KELUAR')}
-					class="pressable animate-enter-1 mt-6 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl hero-gradient-red text-2xl font-bold text-white shadow-lg shadow-red-600/30"
-				>
-					<Square size={26} /> Selesai Kerja
-				</button>
-			{:else}
+			{/if}
+
+			{#if status === 'belum_absen' || status === 'sedang_bekerja'}
+				<!-- Satu tombol bulat: aksinya mengikuti status (masuk / keluar) -->
+				<div class="animate-enter-1 mt-8 flex flex-col items-center">
+					<button
+						type="button"
+						on:click={() => keAbsen(status === 'belum_absen' ? 'MASUK' : 'KELUAR')}
+						aria-label={status === 'belum_absen' ? 'Mulai kerja' : 'Selesai kerja'}
+						class="pressable flex h-44 w-44 items-center justify-center rounded-full text-white shadow-xl {status ===
+						'belum_absen'
+							? 'hero-gradient-emerald shadow-emerald-600/40'
+							: 'hero-gradient-red shadow-red-600/40'}"
+					>
+						{#if status === 'belum_absen'}
+							<Play size={64} />
+						{:else}
+							<Square size={56} />
+						{/if}
+					</button>
+					<p class="mt-4 text-lg font-extrabold text-slate-800">
+						{status === 'belum_absen' ? 'Mulai Kerja' : 'Selesai Kerja'}
+					</p>
+					<p class="mt-1 text-sm text-slate-400">
+						{status === 'belum_absen'
+							? 'Ketuk untuk mulai bekerja'
+							: 'Ketuk untuk mengakhiri shift'}
+					</p>
+				</div>
+			{/if}
+
+			{#if today.status === 'selesai_bekerja'}
 				<div class="mt-6 space-y-3 text-center">
 					<div class="flex justify-between rounded-2xl bg-slate-50 px-5 py-4">
 						<span class="font-medium text-slate-500">Masuk</span>

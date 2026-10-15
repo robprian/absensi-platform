@@ -3,6 +3,7 @@
 	import { Clock3, Phone, Lock, Eye, EyeOff, TriangleAlert } from 'lucide-svelte';
 	import { api, ApiError } from '$lib/api';
 	import { setSession } from '$lib/auth';
+	import { publicSettings } from '$lib/settings';
 
 	let identifier = '';
 	let password = '';
@@ -10,15 +11,60 @@
 	let loading = false;
 	let error = '';
 
+	// Cloudflare Turnstile (anti-bot). Widget hanya tampil bila diaktifkan admin.
+	let turnstileToken = '';
+	let turnstileEl: HTMLDivElement | null = null;
+	let turnstileRendered = false;
+
+	$: turnstileCfg = $publicSettings?.turnstile;
+
+	function renderTurnstile(siteKey: string) {
+		if (turnstileRendered || !turnstileEl) return;
+		const w = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+		if (!w) return;
+		turnstileRendered = true;
+		w.render(turnstileEl, {
+			sitekey: siteKey,
+			callback: (token: string) => (turnstileToken = token),
+			'expired-callback': () => (turnstileToken = ''),
+			'error-callback': () => (turnstileToken = '')
+		});
+	}
+
+	function ensureTurnstileScript(siteKey: string) {
+		if (turnstileRendered) return;
+		const w = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+		if (w) {
+			renderTurnstile(siteKey);
+			return;
+		}
+		if (document.querySelector('script[data-turnstile]')) return;
+		const s = document.createElement('script');
+		s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+		s.async = true;
+		s.defer = true;
+		s.dataset.turnstile = '1';
+		s.onload = () => renderTurnstile(siteKey);
+		document.head.appendChild(s);
+	}
+
+	$: if (turnstileCfg?.enabled && turnstileCfg.site_key && turnstileEl) {
+		ensureTurnstileScript(turnstileCfg.site_key);
+	}
+
 	async function masuk() {
 		error = '';
 		if (!identifier.trim() || !password) {
 			error = 'Isi nomor HP / ID karyawan dan kata sandi.';
 			return;
 		}
+		if (turnstileCfg?.enabled && !turnstileToken) {
+			error = 'Selesaikan verifikasi keamanan dulu.';
+			return;
+		}
 		loading = true;
 		try {
-			const res = await api.login(identifier.trim(), password);
+			const res = await api.login(identifier.trim(), password, turnstileToken || undefined);
 			setSession(res.token, res.employee);
 			await goto('/');
 		} catch (e) {
@@ -26,6 +72,10 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	interface TurnstileApi {
+		render: (el: HTMLElement, opts: Record<string, unknown>) => string;
 	}
 </script>
 
@@ -101,6 +151,12 @@
 			>
 				<TriangleAlert size={18} class="mt-0.5 shrink-0" />
 				<span>{error}</span>
+			</div>
+		{/if}
+
+		{#if turnstileCfg?.enabled && turnstileCfg.site_key}
+			<div class="flex justify-center">
+				<div bind:this={turnstileEl}></div>
 			</div>
 		{/if}
 

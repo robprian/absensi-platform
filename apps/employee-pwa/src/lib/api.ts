@@ -155,10 +155,16 @@ export interface BrandSettings {
 	primary_color: string;
 }
 
+export interface TurnstileSettings {
+	enabled: boolean;
+	site_key: string | null;
+}
+
 export interface PublicSettings {
 	reimbursement_enabled: boolean;
 	nama_perusahaan: string;
 	brand: BrandSettings;
+	turnstile: TurnstileSettings;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,10 +172,11 @@ export interface PublicSettings {
 // ---------------------------------------------------------------------------
 
 export const api = {
-	login(identifier: string, password: string) {
+	login(identifier: string, password: string, turnstileToken?: string) {
 		return postJson<{ token: string; employee: Employee }>('/auth/login', {
 			identifier,
-			password
+			password,
+			...(turnstileToken ? { turnstile_token: turnstileToken } : {})
 		});
 	},
 	logout() {

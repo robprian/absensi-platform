@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
+use App\Services\TurnstileService;
 use Illuminate\Http\Request;
 
 class PublicSettingController extends Controller
@@ -23,6 +24,10 @@ class PublicSettingController extends Controller
                 'icon_512_url' => $this->brandUrl('brand_icon_512_path'),
                 'favicon_url' => $this->brandUrl('brand_favicon_path'),
                 'primary_color' => SystemSetting::get('brand_primary_color', '#059669'),
+            ],
+            'turnstile' => [
+                'enabled' => TurnstileService::isEnabled(),
+                'site_key' => TurnstileService::siteKey(),
             ],
         ]);
     }

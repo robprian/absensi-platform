@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\TurnstileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -24,7 +25,17 @@ class AuthController extends Controller
             'identifier' => ['required', 'string', 'max:150'],
             'password' => ['required', 'string'],
             'device_name' => ['nullable', 'string', 'max:100'],
+            'turnstile_token' => ['nullable', 'string', 'max:2048'],
         ]);
+
+        // Anti-bot: verifikasi Turnstile bila proteksi aktif.
+        if (TurnstileService::isEnabled()
+            && !TurnstileService::verify($data['turnstile_token'] ?? null, $request->ip())
+        ) {
+            throw ValidationException::withMessages([
+                'identifier' => ['Verifikasi keamanan gagal. Coba lagi.'],
+            ]);
+        }
 
         $user = $this->findUserByIdentifier($data['identifier']);
 

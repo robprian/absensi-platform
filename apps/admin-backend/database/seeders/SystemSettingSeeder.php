@@ -30,6 +30,10 @@ class SystemSettingSeeder extends Seeder
 
             ['payroll_lock_days', '0', 'integer', 'payroll', 'Kunci otomatis periode setelah N hari (0 = manual)'],
 
+            // Keamanan: Cloudflare Turnstile anti-bot untuk form login
+            ['turnstile_enabled', '0', 'boolean', 'security', 'Proteksi Turnstile aktif (butuh site key + TURNSTILE_SECRET_KEY)'],
+            ['turnstile_site_key', '', 'string', 'security', 'Turnstile site key (tampil di widget login)'],
+
             // Branding: logo, ikon PWA, favicon (diatur dari admin portal)
             ['brand_logo_path', '', 'string', 'branding', 'Logo perusahaan (path file)'],
             ['brand_icon_192_path', '', 'string', 'branding', 'Ikon PWA 192x192 (path file)'],

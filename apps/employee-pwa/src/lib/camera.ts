@@ -95,7 +95,10 @@ export function requestGps(
 
 				const fix: GpsFix = { latitude, longitude, accuracy: accuracy ?? null };
 				// Simpan yang terbaik (akurasi terkecil).
-				if (!best || (fix.accuracy !== null && (best.accuracy === null || fix.accuracy < best.accuracy))) {
+				if (
+					!best ||
+					(fix.accuracy !== null && (best.accuracy === null || fix.accuracy < best.accuracy))
+				) {
 					best = fix;
 				}
 				onUpdate?.(fix);

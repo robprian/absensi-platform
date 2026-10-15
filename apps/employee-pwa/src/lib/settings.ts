@@ -13,12 +13,19 @@ export async function loadPublicSettings(): Promise<void> {
 		const s = await api.publicSettings();
 		publicSettings.set(s);
 		// Terapkan favicon & warna tema dinamis.
-		applyBranding(s.brand);
+		applyBranding(s.brand, s.nama_perusahaan || 'AbsensiKu');
 	} catch {
 		publicSettings.set({
 			reimbursement_enabled: false,
 			nama_perusahaan: 'Perusahaan',
-			brand: { logo_url: null, icon_192_url: null, icon_512_url: null, favicon_url: null, primary_color: '#059669' }
+			brand: {
+				logo_url: null,
+				icon_192_url: null,
+				icon_512_url: null,
+				favicon_url: null,
+				primary_color: '#059669'
+			},
+			turnstile: { enabled: false, site_key: null }
 		});
 	} finally {
 		settingsLoading.set(false);
@@ -27,7 +34,15 @@ export async function loadPublicSettings(): Promise<void> {
 }
 
 /** Terapkan branding dinamis: favicon + theme-color + manifest PWA. */
-function applyBranding(brand: { favicon_url: string | null; primary_color: string; icon_192_url: string | null; icon_512_url: string | null }): void {
+export function applyBranding(
+	brand: {
+		favicon_url: string | null;
+		primary_color: string;
+		icon_192_url: string | null;
+		icon_512_url: string | null;
+	},
+	appName = 'AbsensiKu'
+): void {
 	if (typeof document === 'undefined') return;
 	try {
 		if (brand.favicon_url) {
@@ -52,15 +67,37 @@ function applyBranding(brand: { favicon_url: string | null; primary_color: strin
 		// Manifest dinamis: pakai ikon custom jika ada.
 		if (brand.icon_192_url || brand.icon_512_url) {
 			const icons = [];
-			if (brand.icon_192_url) icons.push({ src: brand.icon_192_url, sizes: '192x192', type: 'image/png', purpose: 'any' });
-			if (brand.icon_512_url) icons.push({ src: brand.icon_512_url, sizes: '512x512', type: 'image/png', purpose: 'any' });
+			if (brand.icon_192_url)
+				icons.push({
+					src: brand.icon_192_url,
+					sizes: '192x192',
+					type: 'image/png',
+					purpose: 'any'
+				});
+			if (brand.icon_512_url)
+				icons.push({
+					src: brand.icon_512_url,
+					sizes: '512x512',
+					type: 'image/png',
+					purpose: 'any'
+				});
 			// Fallback ke ikon default untuk maskable.
-			icons.push({ src: 'icons/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' });
-			icons.push({ src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' });
+			icons.push({
+				src: 'icons/icon-maskable-192.png',
+				sizes: '192x192',
+				type: 'image/png',
+				purpose: 'maskable'
+			});
+			icons.push({
+				src: 'icons/icon-maskable-512.png',
+				sizes: '512x512',
+				type: 'image/png',
+				purpose: 'maskable'
+			});
 
 			const manifest = {
-				name: 'AbsensiKu',
-				short_name: 'AbsensiKu',
+				name: appName,
+				short_name: appName,
 				start_url: '/',
 				display: 'standalone',
 				background_color: '#ffffff',
