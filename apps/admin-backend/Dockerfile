@@ -11,23 +11,6 @@
 # File ini milik INFRA (jangan dihapus saat scaffolding ulang backend).
 # ---------------------------------------------------------------------------
 
-# ---- composer dependencies (prod only) -------------------------------------
-FROM composer:2 AS vendor
-WORKDIR /app
-COPY composer.json composer.lock* ./
-# --ignore-platform-reqs: ext-xml/ext-gd belum ada di image composer, tapi
-# WAJIB ada saat runtime (dibutuhkan dompdf + maatwebsite/excel); ekstensi
-# tersebut di-install di stage runtime di bawah.
-RUN composer install \
-      --no-dev \
-      --no-interaction \
-      --no-progress \
-      --no-scripts \
-      --prefer-dist \
-      --optimize-autoloader \
-      --ignore-platform-reqs
-
-# ---- runtime ----------------------------------------------------------------
 FROM php:8.3-fpm-alpine AS app
 
 # Ekstensi yang dibutuhkan Laravel + Postgres + Redis + Queue:
@@ -63,20 +46,34 @@ RUN apk add --no-cache \
     && apk del .build-deps \
     && rm -rf /tmp/* /var/cache/apk/*
 
+# Composer dari image resmi (binary saja, tanpa stage terpisah).
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 COPY docker/php/app.ini /usr/local/etc/php/conf.d/zz-app.ini
 
 WORKDIR /var/www/html
 
 # Kode aplikasi milik www-data (user yang menjalankan php-fpm).
 COPY --chown=www-data:www-data . /var/www/html
-COPY --from=vendor --chown=www-data:www-data /app/vendor /var/www/html/vendor
+
+# Install dependency PHP (prod only). Ekstensi sudah ter-install di atas,
+# sehingga composer dapat memvalidasi platform requirements tanpa ignore.
+RUN composer install \
+      --no-dev \
+      --no-interaction \
+      --no-progress \
+      --no-scripts \
+      --prefer-dist \
+      --optimize-autoloader \
+    && composer clear-cache \
+    && rm -rf /tmp/*
 
 RUN mkdir -p storage/framework/cache \
              storage/framework/sessions \
              storage/framework/views \
              storage/logs \
              bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+    && chown -R www-data:www-data storage bootstrap/cache /var/www/html/vendor
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
