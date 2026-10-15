@@ -26,13 +26,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REF: ${{ inputs.ref }}
         run: |
-          conclusion="$(gh run list \
-            --workflow=images.yml \
-            --branch="$REF" \
-            --status=completed \
-            --limit 1 \
-            --json conclusion \
-            --jq '.[0].conclusion // "none"')"
+          conclusion="$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/images.yml/runs?per_page=1&status=completed&branch=$REF" \
+            | jq -r '.workflow_runs[0].conclusion // "none"')"
           echo "Images conclusion untuk ref '$REF': $conclusion"
           if [ "$conclusion" != "success" ]; then
             echo "::error::Images belum hijau untuk ref '$REF' (status: $conclusion). Deploy dibatalkan."
