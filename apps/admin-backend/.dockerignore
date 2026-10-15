@@ -1,0 +1,13 @@
+# Milik INFRA — jangan dihapus saat scaffolding ulang backend.
+.git
+.github
+node_modules
+vendor
+.env*
+!.env.example
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+.phpunit.result.cache
+.phpunit.cache
