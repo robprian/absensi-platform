@@ -1,0 +1,46 @@
+# =====================================================================
+# Absensi & Payroll Platform — DEVELOPMENT overrides
+#   docker compose -f compose.yml -f compose.dev.yml up --build
+#
+#   http://localhost:3000  -> Employee PWA (+ /api/* -> backend)
+#   http://localhost:8000  -> Admin Portal + Backend API
+#   http://localhost:8080  -> tDocs Portal
+#   localhost:5432         -> PostgreSQL (langsung, untuk inspeksi)
+#   localhost:6379         -> Redis (langsung, untuk inspeksi)
+#
+# Catatan: buka PWA via http://localhost (bukan IP LAN) agar browser
+# menganggapnya secure context -> kamera & GPS diizinkan.
+# =====================================================================
+
+services:
+  reverse-proxy:
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+      - "8080:8080"
+    volumes:
+      # Timpa Caddyfile produksi dengan versi dev (port-based, tanpa TLS).
+      - ./docker/proxy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  admin-backend:
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+
+  admin-worker:
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+
+  admin-scheduler:
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"

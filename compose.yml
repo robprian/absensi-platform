@@ -1,0 +1,276 @@
+# =====================================================================
+# Absensi & Payroll Platform — PRODUCTION compose
+#   docker compose up -d --build        (atau ./scripts/init.sh)
+#
+# Service:
+#   employee-pwa    PWA karyawan (nginx static)            - privat
+#   admin-backend   Laravel API + Admin UI (php-fpm :9000) - privat
+#   admin-worker    Laravel queue worker                    - privat
+#   admin-scheduler Laravel scheduler (tiap menit)          - privat
+#   tdocs           tDocs file portal (Go :8080)            - privat
+#   postgres        PostgreSQL 16                           - privat
+#   redis           Redis 7 (queue/cache)                    - privat
+#   reverse-proxy   Caddy :80/:443 -> satu-satunya pintu publik
+#
+# Semua service berkomunikasi lewat network privat "internal".
+# postgres / redis / tdocs / backend TIDAK di-publish ke host.
+# =====================================================================
+
+name: absensi-platform
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-backend-env: &backend-env
+  DB_HOST: postgres
+  DB_PORT: 5432
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  TDOCS_BASE_URL: http://tdocs:8080
+
+services:
+  employee-pwa:
+    build:
+      context: ./apps/employee-pwa
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    image: ghcr.io/robprian/absensi-pwa:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging: *default-logging
+
+  admin-backend:
+    build:
+      context: ./apps/admin-backend
+    image: ghcr.io/robprian/absensi-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["php-fpm"]
+    env_file:
+      - .env
+    environment:
+      <<: *backend-env
+    volumes:
+      - backend-public:/srv/public
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 9000) ? 0 : 1);'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging: *default-logging
+
+  admin-worker:
+    build:
+      context: ./apps/admin-backend
+    image: ghcr.io/robprian/absensi-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["php", "/var/www/html/artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+    env_file:
+      - .env
+    environment:
+      <<: *backend-env
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      admin-backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 384M
+    logging: *default-logging
+
+  admin-scheduler:
+    build:
+      context: ./apps/admin-backend
+    image: ghcr.io/robprian/absensi-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # Cron Laravel: jalankan schedule:run tiap ~60 detik.
+    command: ["sh", "-c", "while true; do php /var/www/html/artisan schedule:run --verbose --no-interaction; sleep 55; done"]
+    env_file:
+      - .env
+    environment:
+      <<: *backend-env
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      admin-backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    logging: *default-logging
+
+  tdocs:
+    build:
+      context: ./services/tdocs
+    image: ghcr.io/robprian/absensi-tdocs:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      TDOCS_DB_PATH: /data/tdocs.db
+      TDOCS_HOST: 0.0.0.0
+      TDOCS_PORT: 8080
+      TDOCS_NO_BROWSER: 1
+      # Kunci akses CDN privat. JANGAN pernah dibagikan ke karyawan.
+      TDOCS_CDN_PUBLIC: 0
+      TDOCS_ADMIN_PASSWORD: ${TDOCS_ADMIN_PASSWORD:?TDOCS_ADMIN_PASSWORD belum diisi di .env}
+    volumes:
+      - tdocs-data:/data
+    networks:
+      - internal
+    healthcheck:
+      # /api/health butuh auth (Bearer = admin password).
+      test: ["CMD-SHELL", "wget -q -O /dev/null --header=\"Authorization: Bearer $${TDOCS_ADMIN_PASSWORD}\" http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging: *default-logging
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-absensi}
+      POSTGRES_USER: ${POSTGRES_USER:-absensi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD belum diisi di .env}
+      TZ: ${TZ:-Asia/Jakarta}
+      PGTZ: ${TZ:-Asia/Jakarta}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$${REDIS_PASSWORD:-}" ]; then
+          exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+        else
+          exec redis-server --appendonly yes
+        fi
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - redisdata:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$${REDIS_PASSWORD:-}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG; else redis-cli ping | grep -q PONG; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+    logging: *default-logging
+
+  reverse-proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN belum diisi di .env}
+      DOCS_DOMAIN: ${DOCS_DOMAIN:?DOCS_DOMAIN belum diisi di .env}
+    volumes:
+      - ./docker/proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - backend-public:/srv/public:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - internal
+    depends_on:
+      employee-pwa:
+        condition: service_healthy
+      admin-backend:
+        condition: service_healthy
+      tdocs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:81/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+    logging: *default-logging
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  tdocs-data:
+  backend-public:
+  caddy-data:
+  caddy-config:
