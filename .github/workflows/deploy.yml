@@ -52,7 +52,17 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -euo pipefail
+            # First-time setup: clone repo bila belum ada.
+            if [ ! -d /home/robby/absensi-platform ]; then
+              echo "== Clone repo (first deploy) =="
+              git clone https://github.com/robprian/absensi-platform.git /home/robby/absensi-platform
+            fi
             cd /home/robby/absensi-platform
+            git pull --ff-only || echo "git pull gagal — lanjut"
+            if [ ! -f .env ]; then
+              echo "::error::File .env belum ada di VPS. Buat .env produksi dulu (lihat .env.example), lalu re-run deploy."
+              exit 1
+            fi
             echo "== Backup sebelum deploy =="
             ./scripts/backup.sh || echo "backup gagal — lanjut dengan hati-hati"
             echo "== Tarik image terbaru =="
