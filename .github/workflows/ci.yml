@@ -191,7 +191,11 @@ jobs:
 
       - name: Validate compose files
         run: |
+          APP_DOMAIN=ci.example.com DOCS_DOMAIN=docs-ci.example.com \
+          POSTGRES_PASSWORD=dummy TDOCS_ADMIN_PASSWORD=dummy \
           docker compose -f compose.yml config -q && echo "compose.yml OK"
+          APP_DOMAIN=ci.example.com DOCS_DOMAIN=docs-ci.example.com \
+          POSTGRES_PASSWORD=dummy TDOCS_ADMIN_PASSWORD=dummy \
           docker compose -f compose.yml -f compose.dev.yml config -q && echo "compose.dev.yml OK"
 
       - name: Validate Caddyfiles
