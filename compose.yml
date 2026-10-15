@@ -231,8 +231,7 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:8080:80"
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN belum diisi di .env}
       DOCS_DOMAIN: ${DOCS_DOMAIN:?DOCS_DOMAIN belum diisi di .env}

@@ -14,6 +14,7 @@
 
 {
 	admin off
+	auto_https off
 }
 
 # Header keamanan bersama. Permissions-Policy dipasang per-site karena PWA
