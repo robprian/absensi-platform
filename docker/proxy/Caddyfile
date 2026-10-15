@@ -1,0 +1,87 @@
+# =====================================================================
+# Absensi Platform — Caddy reverse proxy (PRODUKSI)
+# Domain diambil dari environment: APP_DOMAIN, DOCS_DOMAIN.
+# Caddy mengurus HTTPS otomatis (Let's Encrypt) untuk kedua domain.
+# Admin Portal dilayani di path /admin/* pada APP_DOMAIN (satu domain
+# dengan PWA) — tidak perlu domain admin terpisah.
+#
+# Pola Laravel via php-fpm:
+#   - File statis (public/build/* dsb.) disajikan langsung dari volume
+#     bersama "backend-public" (/srv/public, diisi entrypoint backend).
+#   - Selain itu -> FastCGI ke admin-backend:9000 dengan SCRIPT_FILENAME
+#     menunjuk ke path kode DI DALAM container FPM (/var/www/html/public).
+# =====================================================================
+
+{
+	admin off
+}
+
+# Header keamanan bersama. Permissions-Policy dipasang per-site karena PWA
+# karyawan memang membutuhkan kamera + geolocation.
+(security) {
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-XSS-Protection "0"
+		-Server
+	}
+}
+
+# Backend Laravel (php-fpm). Argumen: {args.0} = upstream FPM.
+(laravel) {
+	root * /srv/public
+	php_fastcgi {args.0} {
+		# Path dari sudut pandang container FPM, BUKAN dari proxy ini.
+		root /var/www/html/public
+	}
+	file_server
+}
+
+# Liveness probe internal. Port 81 TIDAK di-publish ke host.
+:81 {
+	respond /healthz 200
+}
+
+# ---------------------------------------------------------------- PWA ---
+{$APP_DOMAIN} {
+	import security
+	header {
+		# PWA absensi butuh kamera (selfie) + GPS (lokasi absen).
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(self)"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+	encode zstd gzip
+
+	# API same-origin untuk PWA -> tidak ada masalah CORS sama sekali.
+	handle /api/* {
+		import laravel admin-backend:9000
+	}
+	handle /sanctum/* {
+		import laravel admin-backend:9000
+	}
+
+	# Admin Portal (Blade) satu domain dengan PWA, di path /admin/*.
+	handle /admin/* {
+		import laravel admin-backend:9000
+	}
+
+	handle {
+		reverse_proxy employee-pwa:80
+	}
+}
+
+# --------------------------------------------------------------- TDOCS ---
+{$DOCS_DOMAIN} {
+	import security
+	header {
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+	encode zstd gzip
+
+	# tDocs punya login sendiri (TDOCS_ADMIN_PASSWORD). Jangan pernah
+	# memberikan kredensial ini ke karyawan; Laravel mengakses tDocs lewat
+	# API internal http://tdocs:8080 dengan Bearer key.
+	reverse_proxy tdocs:8080
+}

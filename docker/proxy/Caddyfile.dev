@@ -1,0 +1,79 @@
+# =====================================================================
+# Absensi Platform — Caddy reverse proxy (DEVELOPMENT)
+# Dipakai via: docker compose -f compose.yml -f compose.dev.yml up
+#   :3000 -> Employee PWA (+ /api/* ke backend, same-origin)
+#   :8000 -> Admin Portal + Backend API
+#   :8080 -> tDocs Portal
+# HTTP saja (tanpa TLS). Untuk uji kamera/GPS di perangkat, buka lewat
+# http://localhost (localhost = secure context). IP LAN via HTTP TIDAK
+# dianggap secure context oleh browser -> kamera/GPS akan ditolak.
+# =====================================================================
+
+{
+	admin off
+	auto_https off
+}
+
+(security) {
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-XSS-Protection "0"
+		-Server
+	}
+}
+
+(laravel) {
+	root * /srv/public
+	php_fastcgi {args.0} {
+		root /var/www/html/public
+	}
+	file_server
+}
+
+:81 {
+	respond /healthz 200
+}
+
+# ---------------------------------------------------------------- PWA ---
+:3000 {
+	import security
+	header {
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(self)"
+	}
+	encode zstd gzip
+
+	handle /api/* {
+		import laravel admin-backend:9000
+	}
+	handle /sanctum/* {
+		import laravel admin-backend:9000
+	}
+
+	handle {
+		reverse_proxy employee-pwa:80
+	}
+}
+
+# --------------------------------------------------------------- ADMIN ---
+:8000 {
+	import security
+	header {
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	encode zstd gzip
+
+	import laravel admin-backend:9000
+}
+
+# --------------------------------------------------------------- TDOCS ---
+:8080 {
+	import security
+	header {
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	encode zstd gzip
+
+	reverse_proxy tdocs:8080
+}
