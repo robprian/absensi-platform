@@ -17,6 +17,7 @@ use App\Services\TdocsService;
 use App\Services\WorkingHoursService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class SettingsController extends Controller
 {
@@ -188,6 +189,74 @@ class SettingsController extends Controller
         }
 
         return back()->with('ok', 'Pengaturan disimpan.');
+    }
+
+    // ---------------------------------------------------------------
+    // Branding: logo, ikon PWA, favicon (upload dari admin portal)
+    // ---------------------------------------------------------------
+
+    /** Tampilkan halaman branding. */
+    public function branding()
+    {
+        $this->authorize('viewAny', SystemSetting::class);
+        $settings = SystemSetting::where('group_name', 'branding')->orderBy('key')->get()->keyBy('key');
+
+        return view('admin.settings.branding', compact('settings'));
+    }
+
+    /** Upload file branding (logo / ikon / favicon). */
+    public function uploadBranding(Request $request)
+    {
+        $this->authorize('update', SystemSetting::class);
+
+        $data = $request->validate([
+            'key' => ['required', 'string', 'in:brand_logo_path,brand_icon_192_path,brand_icon_512_path,brand_favicon_path'],
+            'file' => ['required', 'file', 'image', 'max:2048', 'mimes:png,jpg,jpeg,webp,svg,ico'],
+        ]);
+
+        $setting = SystemSetting::where('key', $data['key'])->firstOrFail();
+
+        // Hapus file lama jika ada.
+        if ($setting->value && Storage::disk('public')->exists($setting->value)) {
+            Storage::disk('public')->delete($setting->value);
+        }
+
+        // Simpan dengan nama yang konsisten untuk kemudahan serve.
+        $ext = $data['file']->getClientOriginalExtension();
+        $filename = "branding/{$data['key']}.{$ext}";
+        $path = Storage::disk('public')->putFileAs('branding', $data['file'], "{$data['key']}.{$ext}");
+
+        $setting->update(['value' => $path]);
+        Cache::forget("setting:{$setting->key}");
+
+        AuditService::log(
+            'branding.uploaded', $request->user(), 'system_settings', (string) $setting->id,
+            ['key' => $setting->key],
+            ['key' => $setting->key, 'path' => $path]
+        );
+
+        return back()->with('ok', 'File branding berhasil diunggah.');
+    }
+
+    /** Hapus file branding (kembali ke default). */
+    public function deleteBranding(Request $request)
+    {
+        $this->authorize('update', SystemSetting::class);
+
+        $data = $request->validate([
+            'key' => ['required', 'string', 'in:brand_logo_path,brand_icon_192_path,brand_icon_512_path,brand_favicon_path'],
+        ]);
+
+        $setting = SystemSetting::where('key', $data['key'])->firstOrFail();
+
+        if ($setting->value && Storage::disk('public')->exists($setting->value)) {
+            Storage::disk('public')->delete($setting->value);
+        }
+
+        $setting->update(['value' => '']);
+        Cache::forget("setting:{$setting->key}");
+
+        return back()->with('ok', 'File branding dihapus, kembali ke default.');
     }
 
     // ---------------------------------------------------------------

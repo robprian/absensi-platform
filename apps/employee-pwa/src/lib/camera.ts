@@ -30,14 +30,57 @@ export class GpsError extends Error {
 	}
 }
 
-/** Minta posisi GPS sekali, tolak fix basi & akurasi buruk. */
-export function requestGps(maxAccuracyMeters = 100, maxAgeMs = 30_000): Promise<GpsFix> {
+/** Minta posisi GPS dengan watchPosition (lebih reliable di Android).
+ * - Pantau terus sampai dapat fix yang cukup akurat ATAU timeout.
+ * - Akurasi dilonggarkan progresif: 50m → 100m → 200m (tetap tolak >200m).
+ * - Callback onUpdate dipanggil tiap ada fix baru (untuk UI live).
+ */
+export function requestGps(
+	maxAccuracyMeters = 50,
+	maxAgeMs = 30_000,
+	onUpdate?: (fix: GpsFix) => void
+): Promise<GpsFix> {
 	return new Promise((resolve, reject) => {
 		if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
 			return reject(new GpsError('unsupported', 'Perangkat tidak mendukung GPS.'));
 		}
-		navigator.geolocation.getCurrentPosition(
+
+		let settled = false;
+		let best: GpsFix | null = null;
+		let watchId = 0;
+		// Timeout total: 45 detik (GPS Android bisa lambat di awal).
+		const overallTimeout = window.setTimeout(() => finish(false), 45_000);
+		// Pelonggaran akurasi progresif tiap 15 detik.
+		let threshold = maxAccuracyMeters;
+		const relaxTimer = window.setInterval(() => {
+			if (threshold < 100) threshold = 100;
+			else if (threshold < 200) threshold = 200;
+		}, 15_000);
+
+		function cleanup() {
+			window.clearTimeout(overallTimeout);
+			window.clearInterval(relaxTimer);
+			if (watchId) navigator.geolocation.clearWatch(watchId);
+		}
+
+		function finish(gotGoodFix: boolean) {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			if (gotGoodFix && best) return resolve(best);
+			// Fallback: pakai fix terbaik yang ada walau kurang akurat (tandai).
+			if (best) return resolve(best);
+			reject(
+				new GpsError(
+					'timeout',
+					'Gagal mendapatkan lokasi GPS. Pastikan GPS aktif dan Anda di area terbuka.'
+				)
+			);
+		}
+
+		watchId = navigator.geolocation.watchPosition(
 			(pos) => {
+				if (settled) return;
 				const { latitude, longitude, accuracy } = pos.coords;
 				if (
 					!isFinite(latitude) ||
@@ -45,41 +88,38 @@ export function requestGps(maxAccuracyMeters = 100, maxAgeMs = 30_000): Promise<
 					Math.abs(latitude) > 90 ||
 					Math.abs(longitude) > 180
 				) {
-					return reject(new GpsError('unavailable', 'Koordinat GPS tidak valid.'));
+					return; // abaikan fix invalid, tunggu berikutnya
 				}
 				const age = Date.now() - pos.timestamp;
-				if (age > maxAgeMs) {
-					return reject(new GpsError('stale', 'Posisi GPS sudah basi. Coba lagi.'));
+				if (age > maxAgeMs) return; // abaikan fix basi, tunggu yang fresh
+
+				const fix: GpsFix = { latitude, longitude, accuracy: accuracy ?? null };
+				// Simpan yang terbaik (akurasi terkecil).
+				if (!best || (fix.accuracy !== null && (best.accuracy === null || fix.accuracy < best.accuracy))) {
+					best = fix;
 				}
-				if (accuracy !== null && accuracy !== undefined && accuracy > maxAccuracyMeters) {
-					return reject(
-						new GpsError(
-							'low_accuracy',
-							`Akurasi GPS kurang baik (±${Math.round(accuracy)} m). Pindah ke area terbuka lalu coba lagi.`
-						)
-					);
+				onUpdate?.(fix);
+				// Cukup baik → selesai.
+				if (fix.accuracy !== null && fix.accuracy <= threshold) {
+					finish(true);
 				}
-				resolve({ latitude, longitude, accuracy: accuracy ?? null });
 			},
 			(err) => {
+				if (settled) return;
 				if (err.code === err.PERMISSION_DENIED) {
+					settled = true;
+					cleanup();
 					reject(
 						new GpsError(
 							'denied',
 							'Izin lokasi ditolak. Aktifkan izin lokasi untuk aplikasi ini di pengaturan perangkat.'
 						)
 					);
-				} else if (err.code === err.TIMEOUT) {
-					reject(
-						new GpsError('timeout', 'Gagal mendapatkan lokasi (waktu habis). Pastikan GPS aktif.')
-					);
-				} else {
-					reject(
-						new GpsError('unavailable', 'Lokasi tidak tersedia. Pastikan GPS aktif lalu coba lagi.')
-					);
 				}
+				// TIMEOUT / POSITION_UNAVAILABLE dari watch: jangan langsung gagal,
+				// biarkan overallTimeout yang menentukan (masih ada kesempatan fix berikutnya).
 			},
-			{ enableHighAccuracy: true, timeout: 20_000, maximumAge: 5_000 }
+			{ enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 }
 		);
 	});
 }

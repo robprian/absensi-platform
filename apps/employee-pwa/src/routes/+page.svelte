@@ -102,7 +102,7 @@
 		<ErrorCard title="Gagal memuat" message={loadError} onRetry={muat} />
 	{:else if today}
 		<!-- Kartu kehadiran utama -->
-		<section class="rounded-3xl bg-white p-6 shadow-sm" aria-live="polite">
+		<section class="card-modern animate-enter p-6" aria-live="polite">
 			<div class="flex items-center justify-between">
 				<span class={`rounded-full px-4 py-1.5 text-sm font-bold ${statusColor}`}
 					>{statusLabel}</span
@@ -128,7 +128,7 @@
 				<button
 					type="button"
 					on:click={() => keAbsen('MASUK')}
-					class="pressable mt-6 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl bg-emerald-600 text-2xl font-bold text-white shadow-lg shadow-emerald-600/25"
+					class="pressable animate-enter-1 mt-6 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl hero-gradient-emerald text-2xl font-bold text-white shadow-lg shadow-emerald-600/30"
 				>
 					<Play size={28} /> Mulai Kerja
 				</button>
@@ -147,7 +147,7 @@
 				<button
 					type="button"
 					on:click={() => keAbsen('KELUAR')}
-					class="pressable mt-6 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl bg-red-600 text-2xl font-bold text-white shadow-lg shadow-red-600/25"
+					class="pressable animate-enter-1 mt-6 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl hero-gradient-red text-2xl font-bold text-white shadow-lg shadow-red-600/30"
 				>
 					<Square size={26} /> Selesai Kerja
 				</button>

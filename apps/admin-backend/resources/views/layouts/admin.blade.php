@@ -4,35 +4,56 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>@yield('title', 'Admin') — {{ config('app.name') }}</title>
+@php
+  $brandFavicon = \App\Models\SystemSetting::get('brand_favicon_path', '');
+  $brandLogo = \App\Models\SystemSetting::get('brand_logo_path', '');
+  $brandColor = \App\Models\SystemSetting::get('brand_primary_color', '#059669');
+@endphp
+@if($brandFavicon)
+<link rel="icon" href="{{ Storage::url($brandFavicon) }}">
+@endif
+<meta name="theme-color" content="{{ $brandColor }}">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = { theme: { extend: { colors: { primary: {50:'#ecfdf5',100:'#d1fae5',500:'#10b981',600:'#059669',700:'#047857'} } } } }
 </script>
 <style>
+  :root { --brand-primary: {{ $brandColor }}; }
   body { font-family: 'Inter', system-ui, sans-serif; }
-  .navlink { display:flex; align-items:center; gap:.75rem; padding:.6rem .9rem; border-radius:.65rem; color:#374151; font-size:.9rem; font-weight:500; }
-  .navlink:hover { background:#ecfdf5; color:#047857; }
-  .navlink.active { background:#059669; color:#fff; }
-  .card { background:#fff; border-radius:1rem; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .navlink { display:flex; align-items:center; gap:.75rem; padding:.6rem .9rem; border-radius:.65rem; color:#374151; font-size:.9rem; font-weight:500; transition: all .2s ease; }
+  .navlink:hover { background:#ecfdf5; color:#047857; transform: translateX(2px); }
+  .navlink.active { background:var(--brand-primary); color:#fff; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+  .card { background:#fff; border-radius:1rem; box-shadow:0 1px 3px rgba(0,0,0,.08); transition: box-shadow .2s ease, transform .2s ease; }
+  .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
   .btn { display:inline-flex; align-items:center; gap:.4rem; padding:.55rem 1rem; border-radius:.65rem; font-weight:600; font-size:.85rem; transition:all .15s; }
-  .btn-primary { background:#059669; color:#fff; } .btn-primary:hover { background:#047857; }
+  .btn-primary { background:var(--brand-primary); color:#fff; } .btn-primary:hover { filter: brightness(0.92); transform: translateY(-1px); }
   .btn-danger { background:#dc2626; color:#fff; } .btn-danger:hover { background:#b91c1c; }
   .btn-ghost { background:#f3f4f6; color:#374151; } .btn-ghost:hover { background:#e5e7eb; }
-  .input { width:100%; border:1px solid #d1d5db; border-radius:.65rem; padding:.55rem .8rem; font-size:.9rem; }
-  .input:focus { outline:none; border-color:#059669; box-shadow:0 0 0 3px #d1fae5; }
+  .input { width:100%; border:1px solid #d1d5db; border-radius:.65rem; padding:.55rem .8rem; font-size:.9rem; transition: border-color .15s, box-shadow .15s; }
+  .input:focus { outline:none; border-color:var(--brand-primary); box-shadow:0 0 0 3px rgba(5,150,105,.15); }
   .label { display:block; font-size:.8rem; font-weight:600; color:#374151; margin-bottom:.3rem; }
   .badge { display:inline-flex; padding:.15rem .6rem; border-radius:9999px; font-size:.72rem; font-weight:600; }
   table.data { width:100%; font-size:.85rem; } table.data th { text-align:left; padding:.6rem .75rem; color:#6b7280; font-weight:600; border-bottom:2px solid #f3f4f6; white-space:nowrap; }
   table.data td { padding:.65rem .75rem; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
   table.data tr:hover td { background:#f9fafb; }
+  /* Smooth page transitions */
+  main { animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
 <div class="flex min-h-screen">
   <aside class="w-64 shrink-0 bg-white border-r border-gray-100 p-4 hidden md:flex md:flex-col gap-1 sticky top-0 h-screen overflow-y-auto">
-    <div class="px-2 py-3 mb-2">
-      <div class="text-lg font-extrabold text-primary-700">AbsensiKu</div>
-      <div class="text-xs text-gray-500">Portal Admin</div>
+    <div class="px-2 py-3 mb-2 flex items-center gap-3">
+      @if($brandLogo)
+        <img src="{{ Storage::url($brandLogo) }}" alt="Logo" class="h-10 w-10 object-contain rounded-lg">
+      @else
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl text-white font-extrabold text-lg" style="background: var(--brand-primary)">A</div>
+      @endif
+      <div>
+        <div class="text-lg font-extrabold" style="color: var(--brand-primary)">{{ \App\Models\SystemSetting::get('app_name', 'AbsensiKu') }}</div>
+        <div class="text-xs text-gray-500">Portal Admin</div>
+      </div>
     </div>
     @php $r = request()->route()->getName(); @endphp
     <a href="{{ route('admin.dashboard') }}" class="navlink {{ str_starts_with($r,'admin.dashboard')?'active':'' }}">📊 Dashboard</a>
@@ -44,6 +65,7 @@ tailwind.config = { theme: { extend: { colors: { primary: {50:'#ecfdf5',100:'#d1
     <a href="{{ route('admin.reports.index') }}" class="navlink {{ str_starts_with($r,'admin.reports')?'active':'' }}">📈 Laporan</a>
     <a href="{{ route('admin.documents.index') }}" class="navlink {{ str_starts_with($r,'admin.documents')?'active':'' }}">📁 Dokumen</a>
     <a href="{{ route('admin.settings.index') }}" class="navlink {{ str_starts_with($r,'admin.settings')?'active':'' }}">⚙️ Pengaturan</a>
+    <a href="{{ route('admin.settings.branding') }}" class="navlink {{ str_starts_with($r,'admin.settings.branding')?'active':'' }}">🎨 Branding</a>
     <a href="{{ route('admin.audit.index') }}" class="navlink {{ str_starts_with($r,'admin.audit')?'active':'' }}">📝 Audit Log</a>
     <div class="mt-auto pt-4 border-t border-gray-100">
       <div class="px-2 text-sm font-semibold">{{ auth()->user()->name }}</div>
@@ -70,6 +92,7 @@ tailwind.config = { theme: { extend: { colors: { primary: {50:'#ecfdf5',100:'#d1
         <a href="{{ route('admin.reports.index') }}" class="navlink {{ str_starts_with($r,'admin.reports')?'active':'' }}">📈 Laporan</a>
         <a href="{{ route('admin.documents.index') }}" class="navlink {{ str_starts_with($r,'admin.documents')?'active':'' }}">📁 Dokumen</a>
         <a href="{{ route('admin.settings.index') }}" class="navlink {{ str_starts_with($r,'admin.settings')?'active':'' }}">⚙️ Pengaturan</a>
+        <a href="{{ route('admin.settings.branding') }}" class="navlink {{ str_starts_with($r,'admin.settings.branding')?'active':'' }}">🎨 Branding</a>
         <a href="{{ route('admin.audit.index') }}" class="navlink {{ str_starts_with($r,'admin.audit')?'active':'' }}">📝 Audit</a>
       </div>
     </nav>

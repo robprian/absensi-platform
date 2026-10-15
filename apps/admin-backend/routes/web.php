@@ -73,6 +73,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'can:admin-access'])
     Route::get('/pengaturan', [AdminSettings::class, 'settings'])->name('settings.index');
     Route::put('/pengaturan', [AdminSettings::class, 'updateSettings'])->name('settings.update');
 
+    // Branding: logo, ikon PWA, favicon
+    Route::get('/pengaturan/branding', [AdminSettings::class, 'branding'])->name('settings.branding');
+    Route::post('/pengaturan/branding', [AdminSettings::class, 'uploadBranding'])->name('settings.branding.upload');
+    Route::delete('/pengaturan/branding', [AdminSettings::class, 'deleteBranding'])->name('settings.branding.delete');
+
     // Audit log
     Route::get('/audit-log', [AdminSettings::class, 'auditLogs'])->name('audit.index');
 

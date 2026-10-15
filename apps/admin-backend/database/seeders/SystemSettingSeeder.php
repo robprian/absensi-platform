@@ -29,6 +29,13 @@ class SystemSettingSeeder extends Seeder
             ['reimbursement_enabled', '1', 'boolean', 'reimbursement', 'Fitur reimburse aktif/nonaktif'],
 
             ['payroll_lock_days', '0', 'integer', 'payroll', 'Kunci otomatis periode setelah N hari (0 = manual)'],
+
+            // Branding: logo, ikon PWA, favicon (diatur dari admin portal)
+            ['brand_logo_path', '', 'string', 'branding', 'Logo perusahaan (path file)'],
+            ['brand_icon_192_path', '', 'string', 'branding', 'Ikon PWA 192x192 (path file)'],
+            ['brand_icon_512_path', '', 'string', 'branding', 'Ikon PWA 512x512 (path file)'],
+            ['brand_favicon_path', '', 'string', 'branding', 'Favicon web (path file)'],
+            ['brand_primary_color', '#059669', 'string', 'branding', 'Warna utama tema (hex)'],
         ];
 
         foreach ($settings as [$key, $value, $type, $group, $desc]) {

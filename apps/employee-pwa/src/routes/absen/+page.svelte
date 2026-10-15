@@ -37,6 +37,8 @@
 	let stream: MediaStream | null = null;
 	let videoEl: HTMLVideoElement | null = null;
 	let gps: GpsFix | null = null;
+	let gpsMencari = false;
+	let gpsAkurasi: number | null = null;
 	let address: string | null = null;
 	let now = new Date();
 	let clockTimer: ReturnType<typeof setInterval> | undefined;
@@ -66,8 +68,13 @@
 			stream = await openFrontCamera();
 			step = 'kamera';
 			// GPS menyusul; pratinjau tetap tampil sambil menunggu fix.
+			// onUpdate: tampilkan status live (mencari → akurasi membaik).
+			gpsMencari = true;
 			try {
-				gps = await requestGps();
+				gps = await requestGps(50, 30_000, (fix) => {
+					gps = fix;
+					gpsAkurasi = fix.accuracy;
+				});
 				void resolveAddress();
 			} catch (e) {
 				if (e instanceof GpsError) {
@@ -76,6 +83,8 @@
 				} else {
 					error = 'Gagal mendapatkan lokasi.';
 				}
+			} finally {
+				gpsMencari = false;
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Gagal mengakses kamera.';
@@ -85,8 +94,12 @@
 	async function cobaGpsLagi() {
 		error = '';
 		errorKind = null;
+		gpsMencari = true;
 		try {
-			gps = await requestGps();
+			gps = await requestGps(50, 30_000, (fix) => {
+				gps = fix;
+				gpsAkurasi = fix.accuracy;
+			});
 			void resolveAddress();
 		} catch (e) {
 			if (e instanceof GpsError) {
@@ -95,6 +108,8 @@
 			} else {
 				error = 'Gagal mendapatkan lokasi.';
 			}
+		} finally {
+			gpsMencari = false;
 		}
 	}
 
@@ -283,6 +298,11 @@
 						{#if gps}
 							GPS: {gps.latitude.toFixed(6)}, {gps.longitude.toFixed(6)}
 							{gps.accuracy !== null ? `• ±${Math.round(gps.accuracy)} m` : ''}
+							{#if gpsMencari}<span class="text-amber-300"> • mempertajam…</span>{/if}
+						{:else if gpsMencari}
+							<span class="inline-flex items-center gap-1">
+								<Loader2 size={12} class="animate-spin" /> Mencari lokasi GPS…
+							</span>
 						{:else}
 							Mencari lokasi…
 						{/if}
@@ -299,13 +319,20 @@
 						<TriangleAlert size={18} class="mt-0.5 shrink-0" />
 						<span>{error}</span>
 					</div>
-					{#if errorKind === 'low_accuracy' || errorKind === 'timeout' || errorKind === 'stale'}
+					{#if errorKind === 'timeout' || errorKind === 'unavailable'}
 						<button
 							type="button"
 							on:click={cobaGpsLagi}
 							class="pressable mt-3 min-h-[48px] w-full rounded-xl bg-white/10 font-bold"
 						>
-							Coba Lagi
+							{#if gpsMencari}
+								<span class="inline-flex items-center gap-2">
+									<Loader2 size={18} class="animate-spin" /> Mencari GPS…
+									{gpsAkurasi !== null ? `(±${Math.round(gpsAkurasi)} m)` : ''}
+								</span>
+							{:else}
+								Coba Lagi
+							{/if}
 						</button>
 					{/if}
 				</div>

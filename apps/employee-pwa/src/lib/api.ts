@@ -147,9 +147,18 @@ export interface AppNotification {
 	sudah_dibaca: boolean;
 }
 
+export interface BrandSettings {
+	logo_url: string | null;
+	icon_192_url: string | null;
+	icon_512_url: string | null;
+	favicon_url: string | null;
+	primary_color: string;
+}
+
 export interface PublicSettings {
 	reimbursement_enabled: boolean;
 	nama_perusahaan: string;
+	brand: BrandSettings;
 }
 
 // ---------------------------------------------------------------------------
