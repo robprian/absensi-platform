@@ -58,6 +58,21 @@ tailwind.config = { theme: { extend: { colors: { primary: {50:'#ecfdf5',100:'#d1
       <div class="text-lg font-extrabold text-primary-700">AbsensiKu Admin</div>
       <form method="POST" action="{{ route('admin.logout') }}">@csrf<button class="btn btn-ghost text-sm">Keluar</button></form>
     </div>
+    {{-- Navigasi mobile: sidebar disembunyikan di layar kecil --}}
+    <nav class="md:hidden mb-4 -mx-4 px-4 overflow-x-auto">
+      <div class="flex gap-2 pb-2 whitespace-nowrap">
+        <a href="{{ route('admin.dashboard') }}" class="navlink {{ str_starts_with($r,'admin.dashboard')?'active':'' }}">📊 Dashboard</a>
+        <a href="{{ route('admin.employees.index') }}" class="navlink {{ str_starts_with($r,'admin.employees')?'active':'' }}">👥 Karyawan</a>
+        <a href="{{ route('admin.attendance.index') }}" class="navlink {{ str_starts_with($r,'admin.attendance')?'active':'' }}">🕒 Absensi</a>
+        <a href="{{ route('admin.sites.index') }}" class="navlink {{ str_starts_with($r,'admin.sites')||str_starts_with($r,'admin.schedules')?'active':'' }}">📅 Jadwal & Lokasi</a>
+        <a href="{{ route('admin.payroll.index') }}" class="navlink {{ str_starts_with($r,'admin.payroll')?'active':'' }}">💰 Penggajian</a>
+        <a href="{{ route('admin.reimbursements.index') }}" class="navlink {{ str_starts_with($r,'admin.reimbursements')?'active':'' }}">🧾 Reimburse</a>
+        <a href="{{ route('admin.reports.index') }}" class="navlink {{ str_starts_with($r,'admin.reports')?'active':'' }}">📈 Laporan</a>
+        <a href="{{ route('admin.documents.index') }}" class="navlink {{ str_starts_with($r,'admin.documents')?'active':'' }}">📁 Dokumen</a>
+        <a href="{{ route('admin.settings.index') }}" class="navlink {{ str_starts_with($r,'admin.settings')?'active':'' }}">⚙️ Pengaturan</a>
+        <a href="{{ route('admin.audit.index') }}" class="navlink {{ str_starts_with($r,'admin.audit')?'active':'' }}">📝 Audit</a>
+      </div>
+    </nav>
     @if(session('ok'))<div class="mb-4 p-3 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm">{{ session('ok') }}</div>@endif
     @if(session('err'))<div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm">{{ session('err') }}</div>@endif
     @if($errors->any())<div class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm"><ul class="list-disc pl-5">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
