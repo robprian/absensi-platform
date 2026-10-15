@@ -144,7 +144,17 @@ jobs:
 
       - name: Build admin-backend
         if: hashFiles('apps/admin-backend/Dockerfile') != ''
-        run: docker build ./apps/admin-backend -t absensi/admin-backend:ci
+        run: |
+          set -o pipefail
+          docker build --progress=plain ./apps/admin-backend -t absensi/admin-backend:ci 2>&1 | tee /tmp/docker-backend.log
+
+      - name: Upload backend build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-backend-log
+          path: /tmp/docker-backend.log
+          retention-days: 3
 
       # tDocs adalah repo Go asli (jangan dimodifikasi); pastikan image-nya
       # tetap bisa di-build dari Dockerfile bawaannya.
