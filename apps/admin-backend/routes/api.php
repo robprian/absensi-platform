@@ -23,6 +23,11 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+// Health check (public, no auth).
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok', 'time' => now()->toIso8601String()]);
+});
+
 Route::prefix('v1')->group(function () {
 
     // Public: login with rate limiting.
