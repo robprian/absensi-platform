@@ -74,5 +74,6 @@ jobs:
             docker compose ps
             echo "== Smoke test =="
             curl -sf https://hadir.seperti.my.id/api/health
-            curl -sf https://data.seperti.my.id/api/health
+            # tDocs /api/health butuh auth (401 = server hidup, bukan error).
+            curl -s -o /dev/null -w "%{http_code}" https://data.seperti.my.id/api/health | grep -qE "^(200|401)$"
             echo "DEPLOY OK"
