@@ -15,9 +15,6 @@ jobs:
   # ------------------------------------------------------- BACKEND ---
   backend:
     name: Backend (Laravel 12 / PHP 8.3)
-    # Dilewati (bukan gagal) bila scaffold backend belum ada — ketat penuh
-    # setelah composer.json mendarat.
-    if: hashFiles('apps/admin-backend/composer.json') != ''
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -97,8 +94,6 @@ jobs:
   # ----------------------------------------------------------- PWA ---
   pwa:
     name: Employee PWA (SvelteKit)
-    # Dilewati (bukan gagal) bila scaffold PWA belum ada.
-    if: hashFiles('apps/employee-pwa/package.json') != ''
     runs-on: ubuntu-latest
     defaults:
       run:
