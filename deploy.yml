@@ -1,0 +1,71 @@
+# =====================================================================
+# Deploy — Absensi & Payroll Platform → SG VPS (43.156.82.52)
+# Fail-closed: HANYA jalan bila workflow Images sukses untuk ref yang sama.
+# SSH memakai Deploy Key dari GitHub Secrets (bukan password):
+#   VPS_HOST, VPS_PORT, VPS_USER, VPS_SSH_KEY
+# VPS menarik image dari GHCR lalu `docker compose up -d`.
+# =====================================================================
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref yang di-deploy (branch / tag)"
+        required: true
+        default: "main"
+
+jobs:
+  check-images:
+    name: Require images hijau
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pastikan workflow Images sukses untuk ref ini
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF: ${{ inputs.ref }}
+        run: |
+          conclusion="$(gh run list \
+            --workflow=images.yml \
+            --branch="$REF" \
+            --status=completed \
+            --limit 1 \
+            --json conclusion \
+            --jq '.[0].conclusion // "none"')"
+          echo "Images conclusion untuk ref '$REF': $conclusion"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::Images belum hijau untuk ref '$REF' (status: $conclusion). Deploy dibatalkan."
+            exit 1
+          fi
+          echo "Images hijau -> deploy diizinkan."
+
+  deploy:
+    name: Deploy ke SG VPS
+    needs: check-images
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /home/robby/absensi-platform
+            echo "== Backup sebelum deploy =="
+            ./scripts/backup.sh || echo "backup gagal — lanjut dengan hati-hati"
+            echo "== Tarik image terbaru =="
+            docker compose pull
+            echo "== Jalankan stack =="
+            docker compose up -d
+            echo "== Tunggu sehat =="
+            sleep 20
+            docker compose ps
+            echo "== Smoke test =="
+            curl -sf https://hadir.seperti.my.id/api/health
+            curl -sf https://data.seperti.my.id/api/health
+            echo "DEPLOY OK"

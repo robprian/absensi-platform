@@ -1,0 +1,94 @@
+# =====================================================================
+# IMAGES — build & push Docker images ke GHCR (ghcr.io/robprian/...)
+# Berjalan setelah CI hijau pada push ke branch main.
+# VPS menarik image ini dengan `docker compose pull`.
+# =====================================================================
+
+name: Images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ci-gate:
+    name: CI harus hijau dulu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tunggu workflow CI pada commit ini
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = context.sha;
+            for (let i = 0; i < 30; i++) {
+              const { data } = await github.rest.checks.listForRef({ owner, repo, ref: sha });
+              const ci = data.check_runs.filter(c => c.name === 'CI' || c.name.startsWith('CI '));
+              const relevant = data.check_runs.filter(c =>
+                ['Backend (Laravel 12 / PHP 8.3)', 'Employee PWA (SvelteKit)', 'Docker image builds', 'Smoke (compose + Caddyfile)'].includes(c.name));
+              const runs = relevant.length ? relevant : data.check_runs;
+              if (runs.length && runs.every(c => c.status === 'completed')) {
+                if (runs.every(c => c.conclusion === 'success' || c.conclusion === 'skipped')) {
+                  core.info('CI hijau — lanjut build images.');
+                  return;
+                }
+                core.setFailed('CI tidak hijau — images tidak di-build.');
+                return;
+              }
+              core.info(`Menunggu CI... (${i + 1}/30)`);
+              await new Promise(r => setTimeout(r, 20000));
+            }
+            core.setFailed('Timeout menunggu CI.');
+
+  build-push:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    needs: [ci-gate]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - context: ./apps/employee-pwa
+            image: ghcr.io/robprian/absensi-pwa
+            build_args: "VITE_API_BASE_URL=/api"
+          - context: ./apps/admin-backend
+            image: ghcr.io/robprian/absensi-backend
+            build_args: ""
+          - context: ./services/tdocs
+            image: ghcr.io/robprian/absensi-tdocs
+            build_args: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login ke GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # tDocs tidak di-commit ke repo ini (lihat .gitignore); clone pada tag
+      # yang di-pin agar build image reproduksibel.
+      - name: Clone tDocs (pinned)
+        if: matrix.image == 'ghcr.io/robprian/absensi-tdocs'
+        run: git clone --depth 1 --branch v3.0.5 https://github.com/robprian/tDocs.git ./services/tdocs
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ matrix.image }}:latest
+            ${{ matrix.image }}:${{ github.sha }}
+          build-args: ${{ matrix.build_args }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

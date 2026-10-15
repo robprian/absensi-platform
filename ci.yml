@@ -1,0 +1,209 @@
+# =====================================================================
+# CI — Absensi & Payroll Platform
+# Gate: backend (composer validate, php -l, migrasi, tests) + PWA
+# (typecheck, lint, build) + docker builds + scan (best-effort) + smoke.
+# Deploy HANYA boleh jalan bila workflow ini hijau (lihat deploy.yml).
+# =====================================================================
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # ------------------------------------------------------- BACKEND ---
+  backend:
+    name: Backend (Laravel 12 / PHP 8.3)
+    # Dilewati (bukan gagal) bila scaffold backend belum ada — ketat penuh
+    # setelah composer.json mendarat.
+    if: hashFiles('apps/admin-backend/composer.json') != ''
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: absensi_test
+          POSTGRES_USER: absensi
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U absensi -d absensi_test"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping | grep -q PONG"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+    defaults:
+      run:
+        working-directory: apps/admin-backend
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: absensi_test
+      DB_USERNAME: absensi
+      DB_PASSWORD: test
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: sync
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_pgsql, redis, bcmath, pcntl, mbstring, zip, opcache
+          coverage: none
+
+      - name: Composer validate (strict)
+        run: composer validate --strict
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHP syntax check (php -l)
+        run: |
+          fail=0
+          while IFS= read -r f; do
+            php -l "$f" > /dev/null || fail=1
+          done < <(find app routes config database -name '*.php' 2>/dev/null)
+          [ "$fail" -eq 0 ] || { echo "::error::php -l menemukan syntax error"; exit 1; }
+          echo "php -l OK"
+
+      - name: Prepare .env for testing
+        run: |
+          if [ -f .env.example ]; then cp .env.example .env; else touch .env; fi
+          php artisan key:generate --force
+
+      - name: Migrate test database
+        run: php artisan migrate --force
+
+      - name: Run tests (Pest/PHPUnit)
+        run: |
+          if [ -d tests ]; then
+            php artisan test --colors=never
+          else
+            echo "::warning::direktori tests/ belum ada — test dilewati (tambahkan sebelum production)"
+          fi
+
+  # ----------------------------------------------------------- PWA ---
+  pwa:
+    name: Employee PWA (SvelteKit)
+    # Dilewati (bukan gagal) bila scaffold PWA belum ada.
+    if: hashFiles('apps/employee-pwa/package.json') != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/employee-pwa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+
+      - name: Typecheck (svelte-check)
+        run: npm run check --if-present
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Build
+        env:
+          VITE_API_BASE_URL: /api
+        run: npm run build
+
+  # -------------------------------------------------------- DOCKER ---
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    needs: [backend, pwa]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # tDocs tidak di-commit ke repo ini; clone pada tag yang di-pin.
+      - name: Clone tDocs (pinned v3.0.5)
+        run: |
+          if [ ! -f ./services/tdocs/Dockerfile ]; then
+            git clone --depth 1 --branch v3.0.5 https://github.com/robprian/tDocs.git ./services/tdocs
+          fi
+
+      - name: Build employee-pwa
+        if: hashFiles('apps/employee-pwa/Dockerfile') != ''
+        run: docker build ./apps/employee-pwa -t absensi/employee-pwa:ci
+
+      - name: Build admin-backend
+        if: hashFiles('apps/admin-backend/Dockerfile') != ''
+        run: docker build ./apps/admin-backend -t absensi/admin-backend:ci
+
+      # tDocs adalah repo Go asli (jangan dimodifikasi); pastikan image-nya
+      # tetap bisa di-build dari Dockerfile bawaannya.
+      - name: Build tdocs
+        run: docker build ./services/tdocs -t absensi/tdocs:ci
+
+  # ---------------------------------------------------------- SCAN ---
+  scan:
+    name: Vulnerability scan (best-effort)
+    runs-on: ubuntu-latest
+    needs: [docker]
+    # Best-effort: beri peringatan, jangan menggagalkan CI bila scanner
+    # bermasalah — tapi temuan HIGH/CRITICAL tetap tampil di ringkasan.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan (vuln, secret, misconfig)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: HIGH,CRITICAL
+          scanners: vuln,secret,misconfig
+
+  # --------------------------------------------------------- SMOKE ---
+  smoke:
+    name: Smoke (compose + Caddyfile)
+    runs-on: ubuntu-latest
+    needs: [docker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose files
+        run: |
+          docker compose -f compose.yml config -q && echo "compose.yml OK"
+          docker compose -f compose.yml -f compose.dev.yml config -q && echo "compose.dev.yml OK"
+
+      - name: Validate Caddyfiles
+        run: |
+          for f in Caddyfile Caddyfile.dev; do
+            docker run --rm \
+              -v "$PWD/docker/proxy/$f:/etc/caddy/Caddyfile:ro" \
+              -e APP_DOMAIN=app.example.com \
+              -e DOCS_DOMAIN=docs.example.com \
+              caddy:2-alpine \
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
+              && echo "$f OK"
+          done
+
+      - name: Shellcheck scripts
+        run: |
+          docker run --rm -v "$PWD/scripts:/scripts:ro" koalaman/shellcheck:stable \
+            -S warning /scripts/init.sh /scripts/backup.sh /scripts/restore.sh \
+            && echo "shellcheck OK"
