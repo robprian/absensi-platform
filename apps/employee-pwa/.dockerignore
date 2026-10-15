@@ -1,0 +1,8 @@
+# Milik INFRA — jangan dihapus saat scaffolding ulang frontend.
+.git
+.github
+node_modules
+.svelte-kit
+build
+.env*
+*.log
