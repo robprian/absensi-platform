@@ -15,20 +15,24 @@
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock* ./
+# --ignore-platform-reqs: ext-xml/ext-gd belum ada di image composer, tapi
+# WAJIB ada saat runtime (dibutuhkan dompdf + maatwebsite/excel); ekstensi
+# tersebut di-install di stage runtime di bawah.
 RUN composer install \
       --no-dev \
       --no-interaction \
       --no-progress \
       --no-scripts \
       --prefer-dist \
-      --optimize-autoloader
+      --optimize-autoloader \
+      --ignore-platform-reqs
 
 # ---- runtime ----------------------------------------------------------------
 FROM php:8.3-fpm-alpine AS app
 
 # Ekstensi yang dibutuhkan Laravel + Postgres + Redis + Queue:
 # pdo_pgsql (DB), pcntl (queue worker), bcmath (kalkulasi rupiah presisi),
-# opcache, zip. redis via PECL.
+# gd + xml (dompdf & maatwebsite/excel), opcache, zip. redis via PECL.
 # DL3018 diabaikan: versi paket apk sengaja tidak di-pin; pin versi dilakukan
 # di base image (php:8.3-fpm-alpine) agar build tidak rapuh terhadap rotasi
 # minor di registry Alpine. SC2086 diabaikan: $PHPIZE_DEPS memang daftar flag
@@ -37,13 +41,22 @@ FROM php:8.3-fpm-alpine AS app
 RUN apk add --no-cache \
         su-exec \
         postgresql-client \
+        libpng \
+        libjpeg-turbo \
+        freetype \
     && apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS \
         postgresql-dev \
+        libpng-dev \
+        libjpeg-turbo-dev \
+        freetype-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
         pdo_pgsql \
         pcntl \
         bcmath \
+        gd \
+        xml \
         opcache \
         zip \
     && pecl install redis \
