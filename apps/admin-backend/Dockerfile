@@ -27,6 +27,7 @@ RUN apk add --no-cache \
         libpng \
         libjpeg-turbo \
         freetype \
+        libzip \
     && apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS \
         postgresql-dev \
